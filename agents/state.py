@@ -1,5 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from enum import Enum
+
+
+class Step(str, Enum):
+    QUESTION = "question"
+    EVALUATE = "evaluate"
+    FEEDBACK = "feedback"
 
 
 class InterviewState(BaseModel):
@@ -15,16 +22,17 @@ class InterviewState(BaseModel):
     # --- Runtime ---
     current_question: Optional[str] = None
     last_answer: Optional[str] = None
-    step: str = "question"   # important for supervisor
-
-    # --- History (FIXED) ---
-    history: List[Dict[str, Any]] = Field(default_factory=list)
+    step: Step = Step.QUESTION
 
     # --- Tracking ---
-    scores: List[int] = Field(default_factory=list)
+    question_count: int = 0
+
+    history: List[Dict[str, Any]] = Field(default_factory=list)
+    scores: List[float] = Field(default_factory=list)
     feedback: List[str] = Field(default_factory=list)
+
     topics_covered: List[str] = Field(default_factory=list)
     weak_areas: List[str] = Field(default_factory=list)
 
     # --- Mode ---
-    mode: str = "RAG"   # RAG → first 3, LLM → after
+    mode: str = "RAG"

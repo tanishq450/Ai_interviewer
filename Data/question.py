@@ -3,7 +3,7 @@ from qdrant.qdrant import QdrantHybridClient
 from models.model_loader import ModelLoader
 from fastembed import SparseTextEmbedding
 from utils.Data_ingestion import chunking
-from utils.Data_ingestion import Chunking
+
 
 model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
@@ -17,7 +17,7 @@ from qdrant_client.models import PointStruct
 class QuestionEmbeddings:
 
     def __init__(self, qdrant: QdrantHybridClient):
-        self.chunking = Chunking()
+        self.chunking = chunking()
         self.model_loader = ModelLoader()
         self.qdrant = qdrant
         self.collection = "question_collection"

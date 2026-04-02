@@ -1,0 +1,53 @@
+class FeedbackAgent:
+
+    def __init__(self, llm):
+        self.llm = llm
+
+    def run(self, state, inputs):
+
+        last_eval = inputs.get("last_eval", {})
+
+        question = last_eval.get("question", "")
+        answer = last_eval.get("answer", "")
+        score = last_eval.get("score", 0.0)
+
+        # -------- Prompt --------
+        prompt = f"""
+        You are an expert interviewer.
+
+        Question:
+        {question}
+
+        Candidate Answer:
+        {answer}
+
+        Score: {score}
+
+        Provide structured feedback:
+        - Strengths
+        - Weaknesses
+        - One improvement suggestion
+
+        Keep it concise.
+        """
+
+        feedback = str(self.llm.invoke(prompt))
+
+        # -------- Update state --------
+        state.feedback.append(feedback)
+
+        # Optional: track weak areas (simple heuristic)
+        if score < 0.5:
+            if state.topic:
+                state.weak_areas.append(state.topic)
+
+        # -------- Reset for next round --------
+        state.current_question = None
+        state.step = "question"
+
+        return {
+            "goto": "supervisor",
+            "state": state,
+            "inputs": {}
+        }
+        

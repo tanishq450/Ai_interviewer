@@ -1,60 +1,48 @@
-from state import InterviewState
+from agents.state import InterviewState
 from models.model_loader import ModelLoader
+
 
 class RagQuestionAgent:
 
-    def __init__(self, resume_embedder, question_embedder, llm):
+    def __init__(self, resume_embedder, question_embedder, llm=None):
         self.resume_embedder = resume_embedder
         self.question_embedder = question_embedder
-        self.llm = ModelLoader().load_llm()
+        self.llm = llm or ModelLoader().load_llm()
 
-    async def run(self, state:InterviewState):
+    async def run(self, state: InterviewState):
 
-        # -------- 1. Get base question from DB --------
         questions = await self.question_embedder.search(
             state.domain,
             state.topic,
             state.difficulty,
-            state.topic  
+            state.topic
         )
 
-        base_q = questions[0] if questions else "Explain this concept."
+        base_q = questions[0] if questions and len(questions) > 0 else "Explain this concept."
 
-        # -------- 2. Get resume context --------
         resume_docs = await self.resume_embedder.search(
             state.user_id,
             state.topic
         )
 
-        context = "\n".join(resume_docs)
+        context = "\n".join(resume_docs) if resume_docs else ""
 
-        # -------- 3. LLM asks the question (rephrase only) --------
         prompt = f"""
-        You are a professional interviewer.
-
         Ask this question naturally:
 
         Question: {base_q}
+        Context: {context}
 
-        Candidate context:
-        {context}
-
-        Rules:
-        - Do NOT change meaning
-        - Do NOT increase difficulty
-        - Keep it conversational
+        Keep it simple and conversational.
         """
 
-        question = self.llm.invoke(prompt)
+        question = str(self.llm.invoke(prompt))
 
         state.current_question = question
         state.step = "question"
+        state.question_count += 1
 
-        return {
-            "goto": "await_user_answer",
-            "state": state,
-            "inputs": {}
-        }
+        return {"goto": "await_user_answer", "state": state, "inputs": {}}
 
 
 class LLMQuestionAgent:
@@ -63,46 +51,35 @@ class LLMQuestionAgent:
         self.resume_embedder = resume_embedder
         self.llm = llm
 
-    async def run(self, state:InterviewState):
+    async def run(self, state: InterviewState):
 
-        # -------- 1. Resume context --------
         resume_docs = await self.resume_embedder.search(
             state.user_id,
             state.topic
         )
 
-        context = "\n".join(resume_docs)
+        context = "\n".join(resume_docs) if resume_docs else ""
 
-        # -------- 2. Use history --------
         history = state.history[-2:] if state.history else []
 
         prompt = f"""
-        You are an expert interviewer.
-
         Domain: {state.domain}
         Topic: {state.topic}
         Difficulty: {state.difficulty}
 
-        Candidate context:
+        Context:
         {context}
 
-        Previous interaction:
+        History:
         {history}
 
-        Instructions:
-        - Ask ONE new question
-        - Do NOT repeat previous questions
-        - Go deeper based on answers
-        - Increase difficulty gradually
+        Ask ONE new question. Do not repeat.
         """
 
-        question = self.llm.invoke(prompt)
+        question = str(self.llm.invoke(prompt))
 
         state.current_question = question
         state.step = "question"
+        state.question_count += 1
 
-        return {
-            "goto": "await_user_answer",
-            "state": state,
-            "inputs": {}
-        }
+        return {"goto": "await_user_answer", "state": state, "inputs": {}}

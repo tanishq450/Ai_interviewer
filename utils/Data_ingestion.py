@@ -4,7 +4,6 @@ import fitz
 import os
 import loguru
 from chonkie import TokenChunker
-from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core import Document
 from pathlib import Path
 from llama_index.core import load_index_from_storage
