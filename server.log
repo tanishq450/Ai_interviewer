@@ -1,0 +1,17 @@
+INFO:     Started server process [43523]
+INFO:     Waiting for application startup.
+2026-04-03 00:33:12.368 | INFO     | main:startup:132 - Starting AI Interviewer...
+2026-04-03 00:33:12.368 | INFO     | models.model_loader:load_llm:26 - Loading LLM
+2026-04-03 00:33:12.368 | INFO     | models.model_loader:load_llm:28 - LLM loaded successfully
+2026-04-03 00:33:12,392 - INFO - HTTP Request: GET http://localhost:6333/collections "HTTP/1.1 200 OK"
+2026-04-03 00:33:12.393 | INFO     | models.model_loader:load_embedding_model:16 - Loading embedding model
+2026-04-03 00:33:12,428 - INFO - HTTP Request: GET http://localhost:6333 "HTTP/1.1 200 OK"
+2026-04-03 00:33:12.438 | INFO     | models.model_loader:load_embedding_model:18 - Embedding model loaded successfully
+2026-04-03 00:33:12.438 | INFO     | main:_load_user_profiles:81 - Loaded 4 resume profile(s) from disk
+2026-04-03 00:33:12.438 | INFO     | main:startup:164 - AI Interviewer ready.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43523]

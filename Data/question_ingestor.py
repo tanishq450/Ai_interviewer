@@ -12,8 +12,11 @@ from qdrant.qdrant import QdrantHybridClient
 from utils.Data_ingestion import Docloader
 
 
-path1 = "/home/tanishq/AI_interviewer/AvenueE_Interview_Questions_updated7-27-2020_0.pdf"
-path2 = "/home/tanishq/AI_interviewer/Top-100-Finance-Interview-Questions-Answers.pdf"
+# PDFs expected next to project root (add files here or update the list)
+PDF_PATHS = [
+    PROJECT_ROOT / "AvenueE_Interview_Questions_updated7-27-2020_0.pdf",
+    PROJECT_ROOT / "Top-100-Finance-Interview-Questions-Answers.pdf",
+]
 
 
 def detect_domain(text: str) -> str:
@@ -44,12 +47,25 @@ async def ingest_all():
     embedder = QuestionEmbeddings(qdrant=qdrant)
     loader = Docloader()
 
-    # -------- Load PDFs --------
-    text1 = loader.load_pdf(path1)
-    text2 = loader.load_pdf(path2)
+    # -------- Load PDFs (skip missing; load_pdf returns None on failure) --------
+    parts: list[str] = []
+    for path in PDF_PATHS:
+        path = Path(path)
+        if not path.is_file():
+            print(f"WARNING: PDF not found, skipping: {path}", flush=True)
+            continue
+        text = loader.load_pdf(str(path))
+        if not text:
+            print(f"WARNING: no text extracted from: {path}", flush=True)
+            continue
+        parts.append(text)
 
-    all_text = text1 + "\n" + text2
-
+    all_text = "\n".join(parts)
+    if not all_text.strip():
+        raise SystemExit(
+            "No PDF text loaded. Add PDFs next to the project root or fix paths in "
+            "Data/question_ingestor.py (PDF_PATHS)."
+        )
 
     lines = all_text.split("\n")
 

@@ -1,8 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Query, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 import json
 import tempfile
 import os
@@ -36,6 +38,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"422 Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(exc.body)},
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,6 +66,30 @@ doc_loader = None
 tts_service = None
 stt_service = None
 user_profiles = {}
+# Resolve relative to this file so load/save works regardless of uvicorn cwd.
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+USER_PROFILES_PATH = os.path.join(_BASE_DIR, "data", "user_profiles.json")
+
+
+def _load_user_profiles():
+    global user_profiles
+    if not os.path.exists(USER_PROFILES_PATH):
+        return
+    try:
+        with open(USER_PROFILES_PATH, "r", encoding="utf-8") as f:
+            user_profiles = json.load(f)
+        logger.info(f"Loaded {len(user_profiles)} resume profile(s) from disk")
+    except Exception as e:
+        logger.warning(f"Could not load {USER_PROFILES_PATH}: {e}")
+
+
+def _save_user_profiles():
+    os.makedirs(os.path.dirname(USER_PROFILES_PATH) or ".", exist_ok=True)
+    try:
+        with open(USER_PROFILES_PATH, "w", encoding="utf-8") as f:
+            json.dump(user_profiles, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not save user profiles: {e}")
 
 
 def infer_profile_from_resume(text: str) -> dict:
@@ -124,6 +159,8 @@ async def startup():
     tts_service = LocalTTSService()
     stt_service = LocalSTTService()
 
+    _load_user_profiles()
+
     logger.info("AI Interviewer ready.")
 
 
@@ -131,7 +168,7 @@ async def startup():
 # Schemas
 # -------------------------------
 class StartInterviewRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     domain: Optional[str] = None
     topic: Optional[str] = None
     difficulty: Optional[str] = None
@@ -140,7 +177,7 @@ class StartInterviewRequest(BaseModel):
 class AnswerRequest(BaseModel):
     user_id: str
     answer: str
-    state: dict
+    state: Any  # kept permissive; validated inside the handler for clearer errors
 
 
 class StartInterviewResponse(BaseModel):
@@ -167,12 +204,27 @@ async def root():
 
 
 @app.post("/interview/start", response_model=StartInterviewResponse)
-async def start_interview(req: StartInterviewRequest):
+async def start_interview(
+    request: Request,
+    req: StartInterviewRequest = Body(default_factory=StartInterviewRequest),
+):
 
-    user_id = req.user_id
+    user_id = (req.user_id or request.query_params.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(
+            422,
+            "user_id is required: put it in the JSON body (e.g. {\"user_id\": \"test\"}) or use ?user_id=test",
+        )
+    # In-memory dict can be empty vs on-disk file (wrong cwd before fix, or reload timing).
     profile = user_profiles.get(user_id)
     if not profile:
-        raise HTTPException(400, "Resume profile not found. Upload resume first.")
+        _load_user_profiles()
+        profile = user_profiles.get(user_id)
+    if not profile:
+        raise HTTPException(
+            400,
+            "Resume profile not found. Upload a resume first with the same user_id (see data/user_profiles.json after an upload).",
+        )
 
     state = InterviewState(
         user_id=user_id,
@@ -191,11 +243,12 @@ async def start_interview(req: StartInterviewRequest):
         result_state = result["state"]
 
         question = result_state.current_question or "Tell me about yourself."
-        audio_id = tts_service.synthesize(question)
+        from starlette.concurrency import run_in_threadpool
+        audio_id = await run_in_threadpool(tts_service.synthesize, question)
 
         return StartInterviewResponse(
             question=question,
-            state=result_state.dict(),
+            state=result_state.model_dump(),
             audio_id=audio_id,
         )
 
@@ -206,16 +259,28 @@ async def start_interview(req: StartInterviewRequest):
 
 @app.post("/interview/answer", response_model=AnswerResponse)
 async def submit_answer(req: AnswerRequest):
+    answer = req.answer
+    raw_state = req.state
+
+    # Validate and coerce state — log details if it fails
+    try:
+        if isinstance(raw_state, str):
+            try:
+                raw_state = json.loads(raw_state, strict=False)
+            except Exception:
+                pass
+                
+        if not isinstance(raw_state, dict):
+            raw_state = dict(raw_state)
+            
+        state = InterviewState.model_validate(raw_state)
+    except Exception as ve:
+        logger.error(f"State validation failed: {ve} | raw state: {raw_state}")
+        raise HTTPException(400, f"Invalid state: {ve}")
+
+    state.last_answer = answer
 
     try:
-        # FIX: safe state load
-        try:
-            state = InterviewState(**req.state)
-        except Exception:
-            raise HTTPException(400, "Invalid state")
-
-        state.last_answer = req.answer
-
         result = await interview_graph.run(state)
 
         # FIX: correct extraction
@@ -228,12 +293,13 @@ async def submit_answer(req: AnswerRequest):
         feedback = result_state.feedback[-1] if result_state.feedback else None
 
         done = result_state.question_count >= 10
-        audio_id = tts_service.synthesize(question) if question and not done else None
+        from starlette.concurrency import run_in_threadpool
+        audio_id = await run_in_threadpool(tts_service.synthesize, question) if question and not done else None
 
         return AnswerResponse(
             question=question,
             feedback=feedback,
-            state=result_state.dict(),
+            state=result_state.model_dump(),
             done=done,
             audio_id=audio_id,
         )
@@ -264,7 +330,8 @@ async def submit_answer_voice(
         tmp_path = tmp.name
 
     try:
-        transcript = stt_service.transcribe(tmp_path)
+        from starlette.concurrency import run_in_threadpool
+        transcript = await run_in_threadpool(stt_service.transcribe, tmp_path)
         if not transcript:
             raise HTTPException(422, "Could not transcribe audio")
 
@@ -284,12 +351,12 @@ async def submit_answer_voice(
         question = result_state.current_question
         feedback = result_state.feedback[-1] if result_state.feedback else None
         done = result_state.question_count >= 10
-        audio_id = tts_service.synthesize(question) if question and not done else None
+        audio_id = await run_in_threadpool(tts_service.synthesize, question) if question and not done else None
 
         return AnswerResponse(
             question=question,
             feedback=feedback,
-            state=result_state.dict(),
+            state=result_state.model_dump(),
             done=done,
             audio_id=audio_id,
             transcript=transcript,
@@ -304,7 +371,18 @@ async def submit_answer_voice(
 
 
 @app.post("/resume/upload")
-async def upload_resume(user_id: str, file: UploadFile = File(...)):
+async def upload_resume(
+    file: UploadFile = File(...),
+    user_id_form: Optional[str] = Form(None),
+    user_id_query: Optional[str] = Query(None, alias="user_id", description="Same as form field user_id; either works"),
+):
+
+    user_id = (user_id_form or user_id_query or "").strip()
+    if not user_id:
+        raise HTTPException(
+            422,
+            "user_id is required: use form field user_id or query ?user_id=your-id",
+        )
 
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF allowed")
@@ -314,13 +392,15 @@ async def upload_resume(user_id: str, file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        text = doc_loader.load_pdf(tmp_path)
+        from starlette.concurrency import run_in_threadpool
+        text = await run_in_threadpool(doc_loader.load_pdf, tmp_path)
 
         if not text:
             raise HTTPException(422, "No text extracted")
 
         profile = infer_profile_from_resume(text)
         user_profiles[user_id] = profile
+        _save_user_profiles()
 
         return {
             "user_id": user_id,

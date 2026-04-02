@@ -1,0 +1,40 @@
+ALEX RIVERA
+alex.rivera.sample@example.com | (555) 010-2847 | San Francisco, CA
+linkedin.com/in/alexrivera-sample | github.com/alexrivera-sample
+
+SUMMARY
+Software engineer with five years building backend services and applied machine learning systems. Focus on Python, APIs, and retrieval-augmented workflows; comfortable owning features end-to-end from design through production monitoring.
+
+EXPERIENCE
+
+Senior Software Engineer — Northbridge Labs (San Francisco, CA)    Mar 2022 — Present
+• Led design and rollout of a FastAPI-based document ingestion pipeline processing 2M+ pages; cut median indexing latency by 38%.
+• Implemented hybrid dense + sparse retrieval over Qdrant for an internal “ask the corpus” tool used by research and support teams.
+• Partnered with ML engineers to evaluate LLM prompts and guardrails; introduced structured logging and basic offline eval suites for answer quality.
+
+Software Engineer — Harbor Analytics (Remote)    Jun 2019 — Feb 2022
+• Built REST and batch ETL jobs in Python and SQL on PostgreSQL and Snowflake; owned schema migrations and data quality checks.
+• Shipped a feature store integration for downstream dashboards; reduced duplicate feature computation via shared Python packages and CI.
+• Mentored two junior engineers through code review and pair programming.
+
+EDUCATION
+
+M.S. Computer Science — State Polytechnic University    2017 — 2019
+B.S. Mathematics — State Polytechnic University    2013 — 2017
+
+PROJECTS (SELECTED)
+
+Interview Prep Assistant — personal project
+• Prototype Q&A system combining LangGraph-style orchestration with local embeddings; experimented with chunking strategies for long PDFs.
+
+Open Source
+• Occasional contributions to documentation and small bugfixes in Python ecosystem tools related to vector search clients.
+
+SKILLS
+Languages: Python, SQL, Bash
+Backend: FastAPI, asyncio, PostgreSQL, Redis
+ML / Data: PyTorch (basics), sentence-transformers, scikit-learn, evaluation and offline metrics
+Infra: Docker, GitHub Actions, AWS (ECS, S3) at a “can deploy and debug” level
+
+CERTIFICATIONS
+AWS Certified Developer – Associate (sample credential ID: AWS-DEV-SAMPLE-0000)
