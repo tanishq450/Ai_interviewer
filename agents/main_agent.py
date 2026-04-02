@@ -1,4 +1,3 @@
-from langgraph.graph import StateGraph, END
 from agents.state import InterviewState
 from agents.supervisor_agent import SupervisorAgent
 from agents.question_agent import RagQuestionAgent, LLMQuestionAgent
@@ -16,40 +15,42 @@ class InterviewGraph:
         self.evaluator = EvaluatorAgent()
         self.feedback = FeedbackAgent(llm)
 
-        self.graph = self._build_graph()
+    async def run(self, state: InterviewState):
+        if state.step == "question" and state.current_question and not state.last_answer:
+            return {"state": state}
 
-    def _build_graph(self):
-        workflow = StateGraph(InterviewState)
+        if state.last_answer:
+            eval_result = self.evaluator.run(
+                state,
+                {
+                    "question": state.current_question or "",
+                    "answer": state.last_answer,
+                },
+            )
+            state = eval_result["state"]
 
-        # Nodes
-        workflow.add_node("supervisor", self.supervisor.run)
-        workflow.add_node("rag_question", self.rag_question.run)
-        workflow.add_node("llm_question", self.llm_question.run)
-        workflow.add_node("evaluator", self.evaluator.run)
-        workflow.add_node("feedback", self.feedback.run)
+            feedback_result = self.feedback.run(
+                state,
+                {"last_eval": state.history[-1] if state.history else {}},
+            )
+            state = feedback_result["state"]
 
-        workflow.set_entry_point("supervisor")
+        # First question is always LLM-driven, then switch to RAG for early rounds.
+        if state.question_count == 0:
+            state.mode = "LLM"
+        elif state.question_count < 3:
+            state.mode = "RAG"
+        else:
+            state.mode = "LLM"
+        state.difficulty = self.supervisor._update_difficulty(state)
+        state.topic = self.supervisor._next_topic(state)
 
-        # Dynamic routing (IMPORTANT)
-        workflow.add_conditional_edges(
-            "supervisor",
-            lambda x: x["goto"],
-            {
-                "rag_question": "rag_question",
-                "llm_question": "llm_question",
-                "evaluator": "evaluator",
-                "feedback": "feedback",
-                "await_user_answer": END
-            }
-        )
+        if state.topic not in state.topics_covered:
+            state.topics_covered.append(state.topic)
 
-        # Back edges
-        workflow.add_edge("rag_question", "supervisor")
-        workflow.add_edge("llm_question", "supervisor")
-        workflow.add_edge("evaluator", "supervisor")
-        workflow.add_edge("feedback", "supervisor")
+        if state.mode == "RAG":
+            result = await self.rag_question.run(state)
+        else:
+            result = await self.llm_question.run(state)
 
-        return workflow.compile()
-
-    def run(self, initial_state: InterviewState):
-        return self.graph.invoke(initial_state)
+        return {"state": result["state"]}

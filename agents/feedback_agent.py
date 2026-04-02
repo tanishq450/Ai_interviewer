@@ -31,7 +31,14 @@ class FeedbackAgent:
         Keep it concise.
         """
 
-        feedback = str(self.llm.invoke(prompt))
+        if hasattr(self.llm, "invoke"):
+            feedback = str(self.llm.invoke(prompt))
+        elif hasattr(self.llm, "complete"):
+            result = self.llm.complete(prompt)
+            feedback = str(getattr(result, "text", result))
+        else:
+            result = self.llm.chat([{"role": "user", "content": prompt}])
+            feedback = str(getattr(getattr(result, "message", None), "content", result))
 
         # -------- Update state --------
         state.feedback.append(feedback)

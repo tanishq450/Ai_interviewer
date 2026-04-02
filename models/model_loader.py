@@ -14,7 +14,7 @@ class ModelLoader:
     def load_embedding_model(self):
         try:
             self.logger.info("Loading embedding model")
-            embedding_model = OllamaEmbedding(model="qwen3-embedding:4b")
+            embedding_model = OllamaEmbedding(model_name="qwen3-embedding:4b")
             self.logger.info("Embedding model loaded successfully")
             return embedding_model
         except Exception as e:

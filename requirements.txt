@@ -27,3 +27,7 @@ qdrant-client
 fastembed
 llama-index-vector-stores-qdrant
 llama-index-readers-file
+transformers
+torch
+scipy
+soundfile

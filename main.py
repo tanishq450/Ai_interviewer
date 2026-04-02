@@ -1,11 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
+import json
 import tempfile
 import os
 import uvicorn
 from loguru import logger
+import uuid
 
 from agents.main_agent import InterviewGraph
 from agents.state import InterviewState
@@ -13,15 +16,23 @@ from models.model_loader import ModelLoader
 from qdrant.qdrant import QdrantHybridClient
 from Data.question import QuestionEmbeddings
 from utils.Data_ingestion import Docloader
-import uuid
+from utils.voice_tts import LocalTTSService
+from utils.voice_stt import LocalSTTService
 
 
-# ─────────────────────────────────────────────
+# -------------------------------
+# Utils
+# -------------------------------
+def create_user():
+    return str(uuid.uuid4())
+
+
+# -------------------------------
 # App setup
-# ─────────────────────────────────────────────
+# -------------------------------
 app = FastAPI(
     title="AI Interviewer",
-    description="An AI-powered interview assistant using RAG + LangGraph",
+    description="AI Interview system using RAG + LangGraph",
     version="1.0.0",
 )
 
@@ -33,33 +44,72 @@ app.add_middleware(
 )
 
 
-# ─────────────────────────────────────────────
-# Shared singletons (initialised on startup)
-# ─────────────────────────────────────────────
-model_loader: ModelLoader = None
-qdrant_client: QdrantHybridClient = None
-question_embedder: QuestionEmbeddings = None
-interview_graph: InterviewGraph = None
-doc_loader: Docloader = None
+# -------------------------------
+# Globals (initialized on startup)
+# -------------------------------
+model_loader = None
+qdrant_client = None
+question_embedder = None
+interview_graph = None
+doc_loader = None
+tts_service = None
+stt_service = None
+user_profiles = {}
 
 
+def infer_profile_from_resume(text: str) -> dict:
+    lowered = (text or "").lower()
+
+    tech_hits = sum(
+        1 for w in ["python", "sql", "api", "llm", "machine learning", "backend", "fastapi"] if w in lowered
+    )
+    finance_hits = sum(
+        1 for w in ["finance", "valuation", "equity", "portfolio", "market", "investment"] if w in lowered
+    )
+    hr_hits = sum(
+        1 for w in ["recruitment", "hiring", "people ops", "talent", "onboarding", "employee"] if w in lowered
+    )
+
+    scores = {"tech": tech_hits, "finance": finance_hits, "hr": hr_hits}
+    domain = max(scores, key=scores.get) if any(scores.values()) else "general"
+
+    topic_map = {
+        "tech": "RAG",
+        "finance": "valuation",
+        "hr": "behavioral",
+        "general": "general",
+    }
+
+    return {
+        "domain": domain,
+        "topic": topic_map[domain],
+        "difficulty": "medium",
+    }
+
+
+# -------------------------------
+# Startup
+# -------------------------------
 @app.on_event("startup")
 async def startup():
-    global model_loader, qdrant_client, question_embedder, interview_graph, doc_loader
+    global model_loader, qdrant_client, question_embedder, interview_graph, doc_loader, tts_service, stt_service
 
-    logger.info("Starting AI Interviewer …")
+    logger.info("Starting AI Interviewer...")
 
     model_loader = ModelLoader()
     llm = model_loader.load_llm()
 
     qdrant_client = QdrantHybridClient()
 
-    # Ensure the question collection exists
-    await qdrant_client.create_collection("question_collection")
+    # Safe Qdrant init (FIXED)
+    try:
+        await qdrant_client.create_collection("question_collection")
+    except Exception as e:
+        logger.warning(f"Qdrant not available: {e}")
 
     question_embedder = QuestionEmbeddings(qdrant=qdrant_client)
 
-    # A minimal resume embedder shim (search returns [] until a resume is uploaded)
+    # Resume embedder (placeholder)
     class _ResumeEmbedder:
         async def search(self, user_id: str, topic: str):
             return []
@@ -71,29 +121,32 @@ async def startup():
     )
 
     doc_loader = Docloader()
+    tts_service = LocalTTSService()
+    stt_service = LocalSTTService()
+
     logger.info("AI Interviewer ready.")
 
 
-# ─────────────────────────────────────────────
-# Request / Response schemas
-# ─────────────────────────────────────────────
+# -------------------------------
+# Schemas
+# -------------------------------
 class StartInterviewRequest(BaseModel):
-    user_id: uuid.UUID
-    domain: str = "tech"
+    user_id: str
+    domain: Optional[str] = None
     topic: Optional[str] = None
-    difficulty: str = "medium"
+    difficulty: Optional[str] = None
 
 
 class AnswerRequest(BaseModel):
     user_id: str
     answer: str
-    # Pass the current state back so the server stays stateless
     state: dict
 
 
 class StartInterviewResponse(BaseModel):
     question: str
     state: dict
+    audio_id: Optional[str] = None
 
 
 class AnswerResponse(BaseModel):
@@ -101,81 +154,160 @@ class AnswerResponse(BaseModel):
     feedback: Optional[str] = None
     state: dict
     done: bool = False
+    audio_id: Optional[str] = None
+    transcript: Optional[str] = None
 
 
-# ─────────────────────────────────────────────
+# -------------------------------
 # Routes
-# ─────────────────────────────────────────────
-@app.get("/", tags=["Health"])
+# -------------------------------
+@app.get("/")
 async def root():
-    return {"status": "ok", "message": "AI Interviewer is running"}
+    return {"status": "ok"}
 
 
-@app.get("/health", tags=["Health"])
-async def health():
-    return {"status": "healthy"}
-
-
-@app.post("/interview/start", response_model=StartInterviewResponse, tags=["Interview"])
+@app.post("/interview/start", response_model=StartInterviewResponse)
 async def start_interview(req: StartInterviewRequest):
-    """
-    Start a new interview session.
-    Returns the first question and the initial state dict.
-    """
+
+    user_id = req.user_id
+    profile = user_profiles.get(user_id)
+    if not profile:
+        raise HTTPException(400, "Resume profile not found. Upload resume first.")
+
     state = InterviewState(
-        user_id=req.user_id,
-        domain=req.domain,
-        topic=req.topic,
-        difficulty=req.difficulty,
+        user_id=user_id,
+        domain=profile.get("domain", "general"),
+        topic=profile.get("topic", "general"),
+        difficulty=profile.get("difficulty", "medium"),
     )
 
     try:
-        result = interview_graph.run(state)
-        result_state = result if isinstance(result, dict) else result.dict()
-        question = result_state.get("current_question", "Tell me about yourself.")
-        return StartInterviewResponse(question=question, state=result_state)
+        result = await interview_graph.run(state)
+
+        # FIX: correct extraction
+        if not isinstance(result, dict) or "state" not in result:
+            raise Exception("Invalid graph response")
+
+        result_state = result["state"]
+
+        question = result_state.current_question or "Tell me about yourself."
+        audio_id = tts_service.synthesize(question)
+
+        return StartInterviewResponse(
+            question=question,
+            state=result_state.dict(),
+            audio_id=audio_id,
+        )
+
     except Exception as e:
-        logger.error(f"Error starting interview: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Start error: {e}")
+        raise HTTPException(500, str(e))
 
 
-@app.post("/interview/answer", response_model=AnswerResponse, tags=["Interview"])
+@app.post("/interview/answer", response_model=AnswerResponse)
 async def submit_answer(req: AnswerRequest):
-    """
-    Submit a candidate's answer and receive the next question or final feedback.
-    """
+
     try:
-        state = InterviewState(**req.state)
+        # FIX: safe state load
+        try:
+            state = InterviewState(**req.state)
+        except Exception:
+            raise HTTPException(400, "Invalid state")
+
         state.last_answer = req.answer
 
-        result = interview_graph.run(state)
-        result_state = result if isinstance(result, dict) else result.dict()
+        result = await interview_graph.run(state)
 
-        question = result_state.get("current_question")
-        feedback_list = result_state.get("feedback", [])
-        latest_feedback = feedback_list[-1] if feedback_list else None
+        # FIX: correct extraction
+        if not isinstance(result, dict) or "state" not in result:
+            raise Exception("Invalid graph response")
 
-        done = result_state.get("question_count", 0) >= 10
+        result_state = result["state"]
+
+        question = result_state.current_question
+        feedback = result_state.feedback[-1] if result_state.feedback else None
+
+        done = result_state.question_count >= 10
+        audio_id = tts_service.synthesize(question) if question and not done else None
 
         return AnswerResponse(
             question=question,
-            feedback=latest_feedback,
-            state=result_state,
+            feedback=feedback,
+            state=result_state.dict(),
             done=done,
+            audio_id=audio_id,
         )
+
     except Exception as e:
-        logger.error(f"Error processing answer: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Answer error: {e}")
+        raise HTTPException(500, str(e))
 
 
-@app.post("/resume/upload", tags=["Resume"])
+@app.get("/audio/{audio_id}")
+async def get_audio(audio_id: str):
+    audio_path = tts_service.get_audio_path(audio_id)
+    if not audio_path or not os.path.exists(audio_path):
+        raise HTTPException(404, "Audio not found")
+    return FileResponse(audio_path, media_type="audio/wav", filename=f"{audio_id}.wav")
+
+
+@app.post("/interview/answer-voice", response_model=AnswerResponse)
+async def submit_answer_voice(
+    user_id: str = Form(...),
+    state: str = Form(...),
+    file: UploadFile = File(...),
+):
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        transcript = stt_service.transcribe(tmp_path)
+        if not transcript:
+            raise HTTPException(422, "Could not transcribe audio")
+
+        try:
+            state_obj = InterviewState(**json.loads(state))
+        except Exception:
+            raise HTTPException(400, "Invalid state")
+
+        state_obj.user_id = user_id
+        state_obj.last_answer = transcript
+
+        result = await interview_graph.run(state_obj)
+        if not isinstance(result, dict) or "state" not in result:
+            raise Exception("Invalid graph response")
+
+        result_state = result["state"]
+        question = result_state.current_question
+        feedback = result_state.feedback[-1] if result_state.feedback else None
+        done = result_state.question_count >= 10
+        audio_id = tts_service.synthesize(question) if question and not done else None
+
+        return AnswerResponse(
+            question=question,
+            feedback=feedback,
+            state=result_state.dict(),
+            done=done,
+            audio_id=audio_id,
+            transcript=transcript,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Voice answer error: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/resume/upload")
 async def upload_resume(user_id: str, file: UploadFile = File(...)):
-    """
-    Upload a PDF resume for a user.  The text is extracted and returned.
-    Future: embed and store in Qdrant for personalised questions.
-    """
+
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        raise HTTPException(400, "Only PDF allowed")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(await file.read())
@@ -183,35 +315,28 @@ async def upload_resume(user_id: str, file: UploadFile = File(...)):
 
     try:
         text = doc_loader.load_pdf(tmp_path)
-        if not text:
-            raise HTTPException(status_code=422, detail="Could not extract text from PDF.")
 
-        logger.info(f"Resume uploaded for user {user_id} ({len(text)} chars)")
+        if not text:
+            raise HTTPException(422, "No text extracted")
+
+        profile = infer_profile_from_resume(text)
+        user_profiles[user_id] = profile
+
         return {
             "user_id": user_id,
-            "filename": file.filename,
-            "characters_extracted": len(text),
-            "preview": text[:300] + "…" if len(text) > 300 else text,
+            "characters": len(text),
+            "preview": text[:300],
+            "detected_domain": profile["domain"],
+            "detected_topic": profile["topic"],
+            "detected_difficulty": profile["difficulty"],
         }
+
     finally:
         os.unlink(tmp_path)
 
 
-@app.get("/interview/summary/{user_id}", tags=["Interview"])
-async def get_summary(user_id: str, state: dict = None):
-    """
-    Placeholder endpoint – in a real setup you'd retrieve the session
-    from a store. For now, accepts the state dict via query/body.
-    """
-    return {
-        "user_id": user_id,
-        "message": "Pass the state dict to /interview/answer to continue, "
-                   "or build a session store for persistent summaries.",
-    }
-
-
-# ─────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────
+# -------------------------------
+# Run
+# -------------------------------
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

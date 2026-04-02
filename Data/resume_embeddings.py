@@ -38,7 +38,13 @@ class ResumeEmbeddings:
         texts = [doc.text for doc in documents]
 
         sparse = compute_sparse_vectors(texts)
-        dense = self.model_loader.load_embedding_model().embed_documents(texts)
+        embedder = self.model_loader.load_embedding_model()
+        if hasattr(embedder, "embed_documents"):
+            dense = embedder.embed_documents(texts)
+        elif hasattr(embedder, "get_text_embedding_batch"):
+            dense = embedder.get_text_embedding_batch(texts)
+        else:
+            dense = [embedder.get_text_embedding(t) for t in texts]
 
         return dense, sparse, texts
 
@@ -74,7 +80,13 @@ class ResumeEmbeddings:
     async def search(self, user_id, query):
 
         # Dense embedding
-        query_dense = self.model_loader.load_embedding_model().embed_query(query)
+        embedder = self.model_loader.load_embedding_model()
+        if hasattr(embedder, "embed_query"):
+            query_dense = embedder.embed_query(query)
+        elif hasattr(embedder, "get_query_embedding"):
+            query_dense = embedder.get_query_embedding(query)
+        else:
+            query_dense = embedder.get_text_embedding(query)
 
         if hasattr(query_dense, "tolist"):
             query_dense = query_dense.tolist()
