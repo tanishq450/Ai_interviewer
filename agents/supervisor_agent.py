@@ -35,7 +35,7 @@ class SupervisorAgent:
         pool = DOMAIN_TOPICS.get(state.domain, [])
 
         for t in state.weak_areas:
-            if t not in state.topics_covered:
+            if state.topics_covered.count(t) < 2:
                 return t
 
         for t in pool:
@@ -85,8 +85,7 @@ class SupervisorAgent:
 
         state.topic = self._next_topic(state)
 
-        if state.topic not in state.topics_covered:
-            state.topics_covered.append(state.topic)
+        state.topics_covered.append(state.topic)
 
         if state.mode == "RAG":
             return {"goto": "rag_question_agent", "state": state, "inputs": {}}

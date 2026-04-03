@@ -45,8 +45,7 @@ class InterviewGraph:
         state.difficulty = self.supervisor._update_difficulty(state)
         state.topic = self.supervisor._next_topic(state)
 
-        if state.topic not in state.topics_covered:
-            state.topics_covered.append(state.topic)
+        state.topics_covered.append(state.topic)
 
         if state.mode == "RAG":
             result = await self.rag_question.run(state)
