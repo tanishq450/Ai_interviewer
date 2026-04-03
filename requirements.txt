@@ -31,3 +31,4 @@ transformers
 torch
 scipy
 soundfile
+json-repair

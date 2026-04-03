@@ -1,1 +1,79 @@
-./pycache
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.eggs/
+
+# ── Virtual envs ──────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── uv ────────────────────────────────────────────────────────────────────────
+# keep uv.lock (reproducible installs), ignore the cache
+.uv/
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+*.secret
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── TTS audio output ──────────────────────────────────────────────────────────
+tmp_audio/
+
+# ── User data (runtime-generated) ─────────────────────────────────────────────
+data/user_profiles.json
+
+# ── HuggingFace / model cache ─────────────────────────────────────────────────
+.cache/
+*.bin
+*.safetensors
+*.gguf
+*.pt
+*.ckpt
+
+# ── Qdrant local storage (if ever run embedded) ───────────────────────────────
+qdrant_storage/
+
+# ── OS junk ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── pytest / coverage ─────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── mypy / ruff ───────────────────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Temp / scratch ────────────────────────────────────────────────────────────
+tmp/
+temp/
+*.tmp

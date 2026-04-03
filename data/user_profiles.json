@@ -33,5 +33,15 @@
     "domain": "tech",
     "topic": "RAG",
     "difficulty": "medium"
+  },
+  "tanishqtech": {
+    "domain": "tech",
+    "topic": "RAG",
+    "difficulty": "medium"
+  },
+  "fiancetest": {
+    "domain": "finance",
+    "topic": "valuation",
+    "difficulty": "medium"
   }
 }

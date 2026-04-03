@@ -1,9 +1,11 @@
+from agents.state import InterviewState
+
 class FeedbackAgent:
 
     def __init__(self, llm):
         self.llm = llm
 
-    def run(self, state, inputs):
+    def run(self, state: InterviewState, inputs):
 
         last_eval = inputs.get("last_eval", {})
 
