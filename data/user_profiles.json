@@ -23,5 +23,15 @@
     "domain": "tech",
     "topic": "RAG",
     "difficulty": "medium"
+  },
+  "test1": {
+    "domain": "tech",
+    "topic": "RAG",
+    "difficulty": "medium"
+  },
+  "test2": {
+    "domain": "tech",
+    "topic": "RAG",
+    "difficulty": "medium"
   }
 }

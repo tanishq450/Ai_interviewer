@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, Any
 import json
+import json_repair
 import tempfile
 import os
 import uvicorn
@@ -257,8 +258,34 @@ async def start_interview(
         raise HTTPException(500, str(e))
 
 
-@app.post("/interview/answer", response_model=AnswerResponse)
-async def submit_answer(req: AnswerRequest):
+@app.post(
+    "/interview/answer",
+    response_model=AnswerResponse,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": AnswerRequest.model_json_schema()
+                }
+            },
+            "required": True,
+        }
+    }
+)
+async def submit_answer(request: Request):
+    body_text = (await request.body()).decode("utf-8")
+    
+    try:
+        data = json_repair.loads(body_text)
+    except Exception as e:
+        logger.error(f"Cannot parse JSON body: {e} | body: {body_text}")
+        raise HTTPException(400, "Invalid JSON body provided.")
+
+    try:
+        req = AnswerRequest(**data)
+    except Exception as e:
+        raise HTTPException(422, f"Validation failure: {e}")
+
     answer = req.answer
     raw_state = req.state
 
@@ -336,7 +363,8 @@ async def submit_answer_voice(
             raise HTTPException(422, "Could not transcribe audio")
 
         try:
-            state_obj = InterviewState(**json.loads(state))
+            parsed_state = json_repair.loads(state)
+            state_obj = InterviewState(**parsed_state)
         except Exception:
             raise HTTPException(400, "Invalid state")
 

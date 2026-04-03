@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Interviewer — Voice-First</title>
+  <meta name="description" content="Practise real interviews with an AI that speaks your questions and listens to your answers." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── BACKGROUND ─────────────────────────────────────────── -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 1 — LANDING
+══════════════════════════════════════════════════════════════ -->
+<section id="screen-landing" class="screen active">
+  <div class="landing-inner">
+    <div class="badge">Powered by AI + Voice</div>
+    <h1>Your AI <span class="grad">Interview Coach</span></h1>
+    <p class="sub">Practice real interviews. The AI speaks every question aloud. You answer by voice or text — your choice.</p>
+    <div class="feature-pills">
+      <span>🔊 TTS Questions</span>
+      <span>🎙️ Voice Answers</span>
+      <span>✍️ Text Answers</span>
+      <span>📊 Live Feedback</span>
+    </div>
+    <button class="btn-primary" id="btn-get-started">Get Started →</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 2 — SETUP
+══════════════════════════════════════════════════════════════ -->
+<section id="screen-setup" class="screen">
+  <div class="card setup-card">
+    <div class="card-header">
+      <div class="icon-wrap">📄</div>
+      <h2>Set Up Your Interview</h2>
+      <p>Upload your resume and we'll tailor every question to your profile.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="user-id-input">Your Name / ID</label>
+      <input type="text" id="user-id-input" placeholder="e.g. tanishq_2024" autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label>Resume (PDF)</label>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="resume-file" accept=".pdf" hidden />
+        <div class="drop-content" id="drop-content">
+          <span class="drop-icon">📂</span>
+          <span>Drop your PDF here or <u>browse</u></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="upload-status" class="status-msg hidden"></div>
+
+    <button class="btn-primary" id="btn-upload">Upload &amp; Continue</button>
+
+    <div class="back-link" id="back-setup">← Back</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 3 — INTERVIEW
+══════════════════════════════════════════════════════════════ -->
+<section id="screen-interview" class="screen">
+
+  <!-- Top bar -->
+  <div class="interview-topbar">
+    <div class="brand-sm">🤖 AI Interviewer</div>
+    <div class="progress-wrap">
+      <span id="q-counter">Question 1 / 10</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <div class="interview-body">
+
+    <!-- Left: Chat transcript -->
+    <div class="chat-panel" id="chat-panel">
+      <div class="chat-empty" id="chat-empty">Conversation will appear here…</div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="controls-panel">
+
+      <!-- Question display -->
+      <div class="question-card" id="question-card">
+        <div class="question-label">🔊 Question</div>
+        <div class="question-text" id="question-text">Loading your first question…</div>
+        <div class="audio-status" id="audio-status">
+          <span class="audio-dot spinning"></span> Generating audio…
+        </div>
+        <audio id="question-audio" hidden></audio>
+        <button class="btn-replay" id="btn-replay" hidden>↻ Replay Audio</button>
+      </div>
+
+      <!-- Feedback -->
+      <div class="feedback-card hidden" id="feedback-card">
+        <div class="feedback-label">💡 Feedback</div>
+        <div class="feedback-text" id="feedback-text"></div>
+      </div>
+
+      <!-- Answer Mode Toggle -->
+      <div class="mode-toggle" id="mode-toggle">
+        <button class="mode-btn active" id="mode-voice-btn" data-mode="voice">🎙️ Voice</button>
+        <button class="mode-btn" id="mode-text-btn" data-mode="text">✍️ Text</button>
+      </div>
+
+      <!-- VOICE ANSWER -->
+      <div id="voice-panel" class="answer-panel">
+        <div class="waveform-wrap" id="waveform-wrap">
+          <canvas id="waveform-canvas" width="280" height="60"></canvas>
+        </div>
+        <button class="mic-btn" id="mic-btn" title="Hold to record">
+          <span class="mic-icon">🎙️</span>
+          <div class="mic-ring"></div>
+        </button>
+        <div class="mic-hint" id="mic-hint">Hold to record your answer</div>
+        <div class="transcript-preview hidden" id="transcript-preview">
+          <span class="t-label">Transcript:</span>
+          <span id="transcript-text"></span>
+        </div>
+      </div>
+
+      <!-- TEXT ANSWER -->
+      <div id="text-panel" class="answer-panel hidden">
+        <textarea id="text-answer" placeholder="Type your answer here…" rows="4"></textarea>
+        <button class="btn-primary" id="btn-submit-text">Submit Answer →</button>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 4 — RESULTS
+══════════════════════════════════════════════════════════════ -->
+<section id="screen-results" class="screen">
+  <div class="results-inner">
+    <div class="results-hero">🏁</div>
+    <h2>Interview Complete!</h2>
+    <p class="sub" id="results-sub">Here's how you did across 10 questions.</p>
+
+    <div class="score-grid" id="score-grid"></div>
+
+    <div class="weak-areas-wrap" id="weak-areas-wrap" style="display:none">
+      <h3>📌 Areas to Improve</h3>
+      <div class="tags" id="weak-tags"></div>
+    </div>
+
+    <div class="feedback-list" id="final-feedback-list"></div>
+
+    <button class="btn-primary" id="btn-restart">Start New Interview</button>
+  </div>
+</section>
+
+<!-- ── GLOBAL LOADER ───────────────────────────────────────── -->
+<div id="global-loader" class="global-loader hidden">
+  <div class="spinner"></div>
+  <span id="loader-msg">Loading…</span>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

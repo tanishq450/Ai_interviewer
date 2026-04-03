@@ -24,7 +24,7 @@ class ModelLoader:
     def load_llm(self):
         try:
             self.logger.info("Loading LLM")
-            llm = Ollama(model="kimi-k2-thinking:cloud")
+            llm = Ollama(model="qwen3.5:397b-cloud")
             self.logger.info("LLM loaded successfully")
             return llm
         except Exception as e:
