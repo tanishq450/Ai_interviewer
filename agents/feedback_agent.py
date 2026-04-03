@@ -13,7 +13,6 @@ class FeedbackAgent:
         answer = last_eval.get("answer", "")
         score = last_eval.get("score", 0.0)
 
-        # -------- Prompt --------
         prompt = f"""
         You are an expert interviewer.
 
