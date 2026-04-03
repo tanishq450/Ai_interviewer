@@ -19,7 +19,7 @@ let appState = {
   analyserNode: null,
   audioCtx: null,
   waveAnimId: null,
-  history: [],           // [{q, a, feedback}]
+  history: [],
 };
 
 /* ──────────────────────────────────────────
@@ -96,7 +96,7 @@ $('btn-upload').addEventListener('click', async () => {
   const file = fileInput._selectedFile || fileInput.files[0];
 
   if (!userId) return showStatus('Please enter a User ID.', 'error');
-  if (!file)   return showStatus('Please select a PDF resume.', 'error');
+  if (!file) return showStatus('Please select a PDF resume.', 'error');
 
   appState.userId = userId;
 
@@ -216,7 +216,7 @@ $('btn-replay').addEventListener('click', () => {
   if (audio.src) {
     audio.currentTime = 0;
     setAudioStatus('playing', 'Playing…');
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
   }
 });
 
@@ -244,11 +244,11 @@ function setMode(mode) {
 ────────────────────────────────────────── */
 const micBtn = $('mic-btn');
 
-micBtn.addEventListener('mousedown',  startRecording);
+micBtn.addEventListener('mousedown', startRecording);
 micBtn.addEventListener('touchstart', startRecording, { passive: true });
-micBtn.addEventListener('mouseup',    stopRecording);
+micBtn.addEventListener('mouseup', stopRecording);
 micBtn.addEventListener('mouseleave', stopRecording);
-micBtn.addEventListener('touchend',   stopRecording);
+micBtn.addEventListener('touchend', stopRecording);
 
 async function startRecording(e) {
   e.preventDefault();
@@ -545,7 +545,7 @@ function getSupportedMime() {
 }
 
 function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
