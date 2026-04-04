@@ -90,22 +90,4 @@ class chunking:
             self.logger.error(f"Error saving chunks: {e}")
     
 
-    def convert_chunks(self, chunks: list):
-        if not chunks:
-            raise ValueError("No chunks provided")
-
-        self.logger.info("Converting chunks to Documents")
-
-        documents = []
-        for chunk in chunks:
-            if isinstance(chunk, str):
-                documents.append(Document(text=chunk))
-            elif hasattr(chunk, "text"):
-                documents.append(Document(text=chunk.text))
-            else:
-                raise TypeError(
-                    f"Unsupported chunk type: {type(chunk)}"
-                )
-
-        self.logger.info("Chunks converted to Documents successfully")
-        return documents
+   

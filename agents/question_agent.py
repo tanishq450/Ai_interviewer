@@ -102,15 +102,12 @@ class LLMQuestionAgent:
     async def run(self, state: InterviewState):
 
         # -------- Retrieve from DB --------
-        questions = await self.resume_embedder.search(
+        resume_chunks = await self.resume_embedder.search(
             state.user_id,
             state.topic
         )
 
-        db_questions = questions if questions else []
-
-        # -------- Context --------
-        context = "\n".join(db_questions[:3])
+        resume_context = "\n".join(resume_chunks) if resume_chunks else ""
 
         history = state.history[-2:] if state.history else []
 
@@ -120,13 +117,13 @@ class LLMQuestionAgent:
         Topic: {state.topic}
         Difficulty: {state.difficulty}
 
-        Use these reference questions:
-        {context}
+        Candidate Background:
+        {resume_context}
 
         Conversation history:
         {history}
 
-        Generate ONE new question.
+        Generate ONE new question relevant to their background.
         Do not repeat.
         """
 

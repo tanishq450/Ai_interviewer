@@ -18,6 +18,7 @@ from agents.state import InterviewState
 from models.model_loader import ModelLoader
 from qdrant.qdrant import QdrantHybridClient
 from Data.question import QuestionEmbeddings
+from Data.resume import ResumeEmbedder
 from utils.Data_ingestion import Docloader
 from utils.voice_tts import LocalTTSService
 from utils.voice_stt import LocalSTTService
@@ -62,6 +63,7 @@ app.add_middleware(
 model_loader = None
 qdrant_client = None
 question_embedder = None
+resume_embedder = None
 interview_graph = None
 doc_loader = None
 tts_service = None
@@ -128,7 +130,7 @@ def infer_profile_from_resume(text: str) -> dict:
 # -------------------------------
 @app.on_event("startup")
 async def startup():
-    global model_loader, qdrant_client, question_embedder, interview_graph, doc_loader, tts_service, stt_service
+    global model_loader, qdrant_client, question_embedder, resume_embedder, interview_graph, doc_loader, tts_service, stt_service
 
     logger.info("Starting AI Interviewer...")
 
@@ -140,18 +142,15 @@ async def startup():
     # Safe Qdrant init (FIXED)
     try:
         await qdrant_client.create_collection("question_collection")
+        await qdrant_client.create_collection("resume_collection")
     except Exception as e:
         logger.warning(f"Qdrant not available: {e}")
 
     question_embedder = QuestionEmbeddings(qdrant=qdrant_client)
-
-    # Resume embedder (placeholder)
-    class _ResumeEmbedder:
-        async def search(self, user_id: str, topic: str):
-            return []
+    resume_embedder = ResumeEmbedder(qdrant=qdrant_client)
 
     interview_graph = InterviewGraph(
-        resume_embedder=_ResumeEmbedder(),
+        resume_embedder=resume_embedder,
         question_embedder=question_embedder,
         llm=llm,
     )
@@ -425,6 +424,9 @@ async def upload_resume(
 
         if not text:
             raise HTTPException(422, "No text extracted")
+
+        # Ingest into Qdrant for this user
+        await resume_embedder.ingest(user_id, text)
 
         profile = infer_profile_from_resume(text)
         user_profiles[user_id] = profile
