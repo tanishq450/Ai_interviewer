@@ -204,7 +204,6 @@ async def startup():
 
     qdrant_client = QdrantHybridClient()
 
-    # Safe Qdrant init (FIXED)
     try:
         await qdrant_client.create_collection("question_collection")
         await qdrant_client.create_collection("resume_collection")

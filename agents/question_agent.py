@@ -46,12 +46,10 @@ class RagQuestionAgent:
         )
 
         # -------- Resume Context (optional) --------
-        query = f"{state.topic} {state.last_answer or ''} project experience skills"
-
         resume_docs = await self.resume_embedder.search(
             state.user_id,
-            query=query,
-            k=4
+            state.topic,
+            top_k=4
         )
 
         resume_context = "\n".join(resume_docs) if resume_docs else ""

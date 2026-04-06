@@ -57,7 +57,37 @@
   "yashr": {
     "domain": "finance",
     "topic": "valuation",
-    "difficulty": "medium"
+    "difficulty": "medium",
+    "resume_topics": [
+      {
+        "name": "Waste-to-Energy (Biogas Production)",
+        "weight": 1.0
+      },
+      {
+        "name": "Biochar Technology",
+        "weight": 1.0
+      },
+      {
+        "name": "Sustainable Sanitation (Biodegradable Toilets)",
+        "weight": 1.0
+      },
+      {
+        "name": "Environmental Research (Water & Waste Systems)",
+        "weight": 0.7
+      },
+      {
+        "name": "Strategic Analysis & Pitch Development",
+        "weight": 0.7
+      },
+      {
+        "name": "Impact Reporting & Metrics",
+        "weight": 0.7
+      },
+      {
+        "name": "Stakeholder Partnership Development (Breweries & NGOs)",
+        "weight": 0.5
+      }
+    ]
   },
   "harshitr": {
     "domain": "finance",
@@ -80,11 +110,11 @@
     "difficulty": "medium",
     "resume_topics": [
       {
-        "name": "C/C++",
+        "name": "C",
         "weight": 1.0
       },
       {
-        "name": "Data Structures and Algorithms",
+        "name": "C++",
         "weight": 1.0
       },
       {
@@ -92,11 +122,15 @@
         "weight": 0.7
       },
       {
+        "name": "Node.js",
+        "weight": 0.7
+      },
+      {
         "name": "React.js",
         "weight": 0.7
       },
       {
-        "name": "Node.js",
+        "name": "MySQL",
         "weight": 0.7
       },
       {
@@ -104,7 +138,7 @@
         "weight": 0.7
       },
       {
-        "name": "Git",
+        "name": "Data Structures & Algorithms",
         "weight": 0.7
       }
     ]
