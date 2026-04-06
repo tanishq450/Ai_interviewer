@@ -58,5 +58,60 @@
     "domain": "finance",
     "topic": "valuation",
     "difficulty": "medium"
+  },
+  "harshitr": {
+    "domain": "finance",
+    "topic": "valuation",
+    "difficulty": "medium"
+  },
+  "Yash": {
+    "domain": "finance",
+    "topic": "valuation",
+    "difficulty": "medium"
+  },
+  "Yashr": {
+    "domain": "finance",
+    "topic": "valuation",
+    "difficulty": "medium"
+  },
+  "rishi01": {
+    "domain": "tech",
+    "topic": "RAG",
+    "difficulty": "medium",
+    "resume_topics": [
+      {
+        "name": "C/C++",
+        "weight": 1.0
+      },
+      {
+        "name": "Data Structures and Algorithms",
+        "weight": 1.0
+      },
+      {
+        "name": "JavaScript",
+        "weight": 0.7
+      },
+      {
+        "name": "React.js",
+        "weight": 0.7
+      },
+      {
+        "name": "Node.js",
+        "weight": 0.7
+      },
+      {
+        "name": "MongoDB",
+        "weight": 0.7
+      },
+      {
+        "name": "Git",
+        "weight": 0.7
+      }
+    ]
+  },
+  "rihsi01": {
+    "domain": "tech",
+    "topic": "RAG",
+    "difficulty": "medium"
   }
 }

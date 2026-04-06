@@ -79,7 +79,8 @@ class ResumeEmbedder:
                     },
                     payload={
                         "user_id": user_id,
-                        "text": t
+                        "text": t,
+                        
                     }
                 )
             )

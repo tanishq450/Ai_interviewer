@@ -2,7 +2,7 @@
    app.js — AI Interviewer Voice-First Frontend
 ============================================================ */
 
-const API = 'http://localhost:8000';
+const API = "http://localhost:8000";
 
 /* ──────────────────────────────────────────
    STATE
@@ -250,6 +250,14 @@ micBtn.addEventListener('mouseup', stopRecording);
 micBtn.addEventListener('mouseleave', stopRecording);
 micBtn.addEventListener('touchend', stopRecording);
 
+function stopRecording(e) {
+  if (e) e.preventDefault();
+  if (!appState.isRecording || !appState.mediaRecorder) return;
+  if (appState.mediaRecorder.state !== 'inactive') {
+    appState.mediaRecorder.stop();
+  }
+}
+
 async function startRecording(e) {
   e.preventDefault();
   if (appState.isRecording) return;
@@ -467,6 +475,102 @@ function escHtml(str) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ──────────────────────────────────────────
+   HANDLE RECORDING STOP (VOICE SUBMIT)
+────────────────────────────────────────── */
+async function handleRecordingStop() {
+  appState.isRecording = false;
+  micBtn.classList.remove('recording');
+  $('mic-hint').textContent = 'Processing your answer...';
+
+  clearWaveform();
+
+  const blob = new Blob(appState.audioChunks, { type: appState.mediaRecorder.mimeType || 'audio/webm' });
+  appState.audioChunks = [];
+
+  if (blob.size === 0) return;
+
+  showLoader('Analysing your answer…');
+  setAnswerEnabled(false);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, 'answer.webm');
+    fd.append('user_id', appState.userId);
+    fd.append('state', JSON.stringify(appState.interviewState));
+
+    const res = await fetch(`${API}/interview/answer-voice`, {
+      method: 'POST',
+      body: fd
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || 'Voice answer failed');
+    }
+
+    const data = await res.json();
+    handleAnswerResponse(data, "Audio Answer");
+
+  } catch (err) {
+    hideLoader();
+    alert(`Voice Submit Error: ${err.message}`);
+    setAnswerEnabled(true);
+    $('mic-hint').textContent = 'Hold to record your answer';
+  }
+}
+
+/* ──────────────────────────────────────────
+   TEXT ANSWER SUBMISSION
+────────────────────────────────────────── */
+$('btn-submit-text').addEventListener('click', submitTextAnswer);
+
+$('text-answer').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitTextAnswer();
+  }
+});
+
+async function submitTextAnswer() {
+  const answerInput = $('text-answer');
+  const answer = answerInput.value.trim();
+
+  if (!answer) {
+    alert('Please type an answer before submitting.');
+    return;
+  }
+
+  showLoader('Submitting answer…');
+  setAnswerEnabled(false);
+  answerInput.value = '';
+
+  try {
+    const res = await fetch(`${API}/interview/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: appState.userId,
+        answer: answer,
+        state: appState.interviewState
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || 'Text answer failed');
+    }
+
+    const data = await res.json();
+    handleAnswerResponse(data, answer);
+
+  } catch (err) {
+    hideLoader();
+    alert(`Text Submit Error: ${err.message}`);
+    setAnswerEnabled(true);
+  }
+}
 
 /* ──────────────────────────────────────────
    INIT

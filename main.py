@@ -22,6 +22,8 @@ from Data.resume import ResumeEmbedder
 from utils.Data_ingestion import Docloader
 from utils.voice_tts import LocalTTSService
 from utils.voice_stt import LocalSTTService
+from typing import List, Dict, Any
+import re
 
 
 # -------------------------------
@@ -123,6 +125,69 @@ def infer_profile_from_resume(text: str) -> dict:
         "topic": topic_map[domain],
         "difficulty": "medium",
     }
+
+
+async def extract_resume_topics(text: str, llm) -> List[Dict[str, Any]]:
+    """Extract key topics/skills from resume text using LLM."""
+    prompt = f"""
+Extract key technical topics and skills from this resume.
+Return ONLY a JSON array with format: [{{"name": "skill/topic name", "weight": 0.5-1.0}}]
+- weight: 1.0 for core expertise, 0.7 for familiar, 0.5 for mentioned
+- Include 5-10 key topics max
+- Focus on technical skills and domain knowledge
+
+Resume:
+{text[:2000]}
+"""
+    try:
+        if hasattr(llm, "invoke"):
+            result = llm.invoke(prompt)
+        elif hasattr(llm, "complete"):
+            result = llm.complete(prompt)
+            result = getattr(result, "text", result)
+        else:
+            result = llm.chat([{"role": "user", "content": prompt}])
+            result = getattr(getattr(result, "message", None), "content", result)
+
+        result_str = str(result)
+        # Try to extract JSON array from response
+        
+        json_match = re.search(r'\[.*\]', result_str, re.DOTALL)
+        if json_match:
+            result_str = json_match.group()
+
+        topics = json_repair.loads(result_str)
+        if isinstance(topics, list) and all(isinstance(t, dict) and "name" in t for t in topics):
+            return topics
+    except Exception as e:
+        logger.warning(f"Topic extraction failed: {e}")
+
+    # Fallback: extract basic topics from resume text
+    return _fallback_topics(text)
+
+
+def _fallback_topics(text: str) -> List[Dict[str, Any]]:
+    """Extract basic topics from resume when LLM extraction fails."""
+    lowered = (text or "").lower()
+
+    tech_keywords = {
+        "python": 1.0, "sql": 0.9, "api": 0.8, "fastapi": 1.0, "django": 0.9,
+        "llm": 1.0, "rag": 1.0, "machine learning": 1.0, "deep learning": 1.0,
+        "transformers": 0.9, "pytorch": 0.9, "tensorflow": 0.9, "nlp": 0.9,
+        "vector database": 0.9, "qdrant": 1.0, "pinecone": 0.8, "langchain": 0.9,
+        "docker": 0.8, "kubernetes": 0.8, "aws": 0.8, "gcp": 0.8, "azure": 0.8,
+        "react": 0.8, "javascript": 0.8, "typescript": 0.8, "nodejs": 0.8,
+        "backend": 0.9, "frontend": 0.8, "full stack": 0.9, "microservices": 0.9,
+    }
+
+    found = []
+    for topic, weight in tech_keywords.items():
+        if topic in lowered:
+            found.append({"name": topic, "weight": weight})
+
+    # Return top 8 by weight
+    found.sort(key=lambda x: x["weight"], reverse=True)
+    return found[:8] if found else [{"name": "general", "weight": 0.5}]
 
 
 # -------------------------------
@@ -231,6 +296,7 @@ async def start_interview(
         domain=profile.get("domain", "general"),
         topic=profile.get("topic", "general"),
         difficulty=profile.get("difficulty", "medium"),
+        resume_topics=profile.get("resume_topics", []),
     )
 
     try:
@@ -429,6 +495,10 @@ async def upload_resume(
         await resume_embedder.ingest(user_id, text)
 
         profile = infer_profile_from_resume(text)
+        # Extract detailed topics from resume
+        llm = model_loader.load_llm()
+        resume_topics = await extract_resume_topics(text, llm)
+        profile["resume_topics"] = resume_topics
         user_profiles[user_id] = profile
         _save_user_profiles()
 
@@ -439,6 +509,7 @@ async def upload_resume(
             "detected_domain": profile["domain"],
             "detected_topic": profile["topic"],
             "detected_difficulty": profile["difficulty"],
+            "resume_topics": resume_topics,
         }
 
     finally:

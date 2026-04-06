@@ -1,5 +1,6 @@
 from loguru import logger
 from agents.state import InterviewState
+import random
 
 
 class SupervisorAgent:
@@ -13,7 +14,7 @@ class SupervisorAgent:
         tail = scores[-k:]
         return sum(tail) / len(tail)
 
-    def _update_difficulty(self, state: InterviewState):
+    def _update_difficulty(self, state:InterviewState):
         avg = self._avg_last(state.scores, k=2)
 
         if avg is None:
@@ -25,26 +26,44 @@ class SupervisorAgent:
             return "easy"
         return "medium"
 
-    def _next_topic(self, state):
 
-        DOMAIN_TOPICS = {
-            "tech": ["RAG", "FastAPI", "Vector DB"],
-            "finance": ["valuation", "risk", "markets"],
-        }
+    def _next_topic(self, state:InterviewState):
+        candidates = []
 
-        pool = DOMAIN_TOPICS.get(state.domain, [])
-
+        # 1. Weak areas → highest priority
         for t in state.weak_areas:
             if state.topics_covered.count(t) < 2:
-                return t
+                candidates.append((t, 1.0))  # high priority
 
-        for t in pool:
-            if t not in state.topics_covered:
-                return t
+        # 2. Resume topics
+        for t in getattr(state, "resume_topics", []):
+            name = t["name"] if isinstance(t, dict) else t
+            weight = t.get("weight", 0.7) if isinstance(t, dict) else 0.7
 
-        return pool[0] if pool else "general"
+            penalty = state.topics_covered.count(name) * 0.3
+            score = weight - penalty
 
-    def run(self, state: InterviewState):
+            candidates.append((name, score))
+
+        # 3. Fallback (only if resume is weak)
+        if not candidates:
+            fallback = {
+                "tech": ["RAG", "FastAPI", "Vector DB"],
+                "finance": ["valuation", "risk", "markets"],
+            }
+            pool = fallback.get(state.domain, ["general"])
+            return random.choice(pool)
+
+        # 4. Sort by score
+        candidates.sort(key=lambda x: x[1], reverse=True)
+
+        # 5. Add randomness (avoid repetition)
+        top_k = candidates[:3]
+        chosen = random.choice(top_k)
+
+        return chosen[0]
+
+    def run(self, state:InterviewState):
 
         self.logger.info(f"Step: {state.step}")
 

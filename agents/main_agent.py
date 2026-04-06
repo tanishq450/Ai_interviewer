@@ -25,6 +25,7 @@ class InterviewGraph:
                 {
                     "question": state.current_question or "",
                     "answer": state.last_answer,
+                    "resume_topics": state.resume_topics
                 },
             )
             state = eval_result["state"]

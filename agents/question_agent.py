@@ -42,19 +42,23 @@ class RagQuestionAgent:
 
         # -------- Context Creation --------
         context = "\n".join(
-            [f"- {q}" for q in retrieved_questions[:5]]
+            [f"- {q}" for q in retrieved_questions[:2]]
         )
 
         # -------- Resume Context (optional) --------
+        query = f"{state.topic} {state.last_answer or ''} project experience skills"
+
         resume_docs = await self.resume_embedder.search(
             state.user_id,
-            state.topic
+            query=query,
+            k=4
         )
 
         resume_context = "\n".join(resume_docs) if resume_docs else ""
 
         # -------- History --------
-        history = state.history[-2:] if state.history else []
+        ###history = state.history[-2:] if state.history else []
+        asked = [h["question"] for h in state.history if "question" in h]
 
         # -------- Prompt --------
         prompt = f"""
@@ -71,7 +75,7 @@ class RagQuestionAgent:
         {resume_context}
 
         Conversation History:
-        {history}
+        {asked}
 
         Generate ONE new interview question.
         - Do not repeat previous questions
@@ -110,21 +114,24 @@ class LLMQuestionAgent:
         resume_context = "\n".join(resume_chunks) if resume_chunks else ""
 
         history = state.history[-2:] if state.history else []
-
+        asked = [h["question"] for h in state.history if "question" in h]
         prompt = f"""
-        You are an interviewer.
+        You are an expert interviewer.
 
+        Domain: {state.domain}
         Topic: {state.topic}
         Difficulty: {state.difficulty}
-
+        
         Candidate Background:
         {resume_context}
 
-        Conversation history:
-        {history}
+        Conversation History:
+        {asked}
 
-        Generate ONE new question relevant to their background.
-        Do not repeat.
+        Generate ONE new interview question.
+        - Do not repeat previous questions
+        - Match difficulty level
+        - Keep it natural and conversational
         """
 
         question = _generate_text(self.llm, prompt)
