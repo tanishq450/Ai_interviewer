@@ -220,7 +220,10 @@ async def startup():
     )
 
     doc_loader = Docloader()
-    tts_service = LocalTTSService()
+    tts_service = LocalTTSService(
+        redis_host=os.getenv("REDIS_HOST", "localhost"),
+        redis_port=int(os.getenv("REDIS_PORT", "6379")),
+    )
     stt_service = LocalSTTService()
 
     _load_user_profiles()

@@ -25,9 +25,43 @@
     "difficulty": "medium"
   },
   "test1": {
-    "domain": "tech",
-    "topic": "RAG",
-    "difficulty": "medium"
+    "domain": "finance",
+    "topic": "valuation",
+    "difficulty": "medium",
+    "resume_topics": [
+      {
+        "name": "Sustainable waste management",
+        "weight": 1.0
+      },
+      {
+        "name": "Biogas production optimization",
+        "weight": 1.0
+      },
+      {
+        "name": "Research methodology & literature review",
+        "weight": 1.0
+      },
+      {
+        "name": "Impact assessment & reporting",
+        "weight": 0.7
+      },
+      {
+        "name": "Strategic analysis & business case development",
+        "weight": 0.7
+      },
+      {
+        "name": "Stakeholder engagement & partnership development",
+        "weight": 0.7
+      },
+      {
+        "name": "Water and sanitation solutions",
+        "weight": 0.5
+      },
+      {
+        "name": "Biochar technology",
+        "weight": 0.5
+      }
+    ]
   },
   "test2": {
     "domain": "tech",

@@ -33,3 +33,4 @@ scipy
 soundfile
 json-repair
 random
+redis
