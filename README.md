@@ -154,20 +154,20 @@ graph TB
    - Pattern: Serialized Pydantic models in request/response payloads
 
 2. **Real-time Voice Processing**
-   - Solved: Local TTS/STT integration with Web Audio API for low-latency interaction
-   - Innovation: Async audio generation with immediate streaming to client
+   - Solved: Local TTS with Facebook/MMS model and Redis caching for performance
+   - Innovation: Async audio generation with Web Audio API integration
 
 3. **Hybrid Search Optimization**
-   - Solved: Combined semantic and lexical search with RRF for 87% better relevance
-   - Implementation: Qdrant hybrid search with custom ranking algorithm
+   - Solved: Combined dense embeddings with sparse BM25 using Qdrant's RRF Fusion
+   - Implementation: Dual retrieval strategy with configurable fusion weights
 
 4. **Agent Coordination**
-   - Solved: LangGraph state machine for complex multi-agent workflows
-   - Pattern: Centralized state with distributed decision-making
+   - Solved: Custom multi-agent system with supervisor pattern
+   - Pattern: Each agent handles specific responsibilities - routing, question generation, evaluation
 
 5. **Adaptive Difficulty Algorithm**
-   - Solved: Rolling window scoring with exponential smoothing for stable difficulty adjustment
-   - Formula: `new_score = α * recent_avg + (1-α) * historical_avg`
+   - Solved: Rolling average of last 2 scores with threshold-based adjustment
+   - Logic: 0.8+ → hard, ≤0.4 → easy, otherwise medium
 
 ---
 
@@ -223,7 +223,7 @@ GET /audio/{id} → WAV Buffer → AudioContext → Speakers
 # Clone and setup in one command
 git clone https://github.com/<your-username>/AI_interviewer.git && \
 cd AI_interviewer && \
-docker-compose up -d qdrant && \
+docker-compose up -d redis && \
 pip install -r requirements.txt && \
 ollama pull qwen3-embedding:4b && \
 ollama pull qwen3.5:397b-cloud && \
@@ -243,11 +243,14 @@ pip install -r requirements.txt
 
 #### 2. Infrastructure Services
 ```bash
-# Start Qdrant (Vector DB)
-docker run -d -p 6333:6333 --name qdrant qdrant/qdrant
+# Start Redis (for caching)
+docker-compose up -d redis
 
 # Start Ollama (if not already running)
 ollama serve
+
+# Start Qdrant (vector database - required separately)
+docker run -d -p 6333:6333 --name qdrant qdrant/qdrant
 
 # Pull required models
 ollama pull qwen3-embedding:4b      # 4B parameter embedding model
@@ -426,7 +429,7 @@ AI_interviewer/
 ├── 📚 Data/                    # Knowledge management
 │   ├── question.py            # Question embedding operations
 │   ├── question_ingestor.py   # Bulk question bank loading
-│   └── resume.py              # Resume processing pipeline
+│   └── resume.py              # Resume embedding operations
 ├── 🛠️ utils/                   # Core utilities
 │   ├── Data_ingestion.py      # PDF parsing & chunking
 │   ├── voice_tts.py           # Text-to-speech engine
@@ -444,7 +447,7 @@ AI_interviewer/
 ├── 📦 requirements.txt         # Python dependencies
 ├── ⚙️ pyproject.toml          # Project configuration
 ├── 🐳 Dockerfile              # Container deployment
-├── 🐙 docker-compose.yml      # Multi-service orchestration
+├── 🐙 docker-compose.yml      # Redis caching service
 └── 📖 README.md               # This documentation
 ```
 
@@ -458,14 +461,15 @@ AI_interviewer/
 
 | **Parameter** | **Location** | **Default Value** | **Notes** |
 |--------------|--------------|------------------|---------|
-| Qdrant URL | `qdrant/qdrant.py` | `http://localhost:6333` | Change to cloud URL for production |
-| Embedding Model | `models/model_loader.py` | `qwen3-embedding:4b` | 4B parameters, good balance |
-| LLM Model | `models/model_loader.py` | `qwen3.5:397b-cloud` | High-quality reasoning |
+| Qdrant URL | `qdrant/qdrant.py` | `http://localhost:6333` | Async client configuration |
+| Embedding Model | `models/model_loader.py` | `qwen3-embedding:4b` | 4B parameters |
+| LLM Model | `models/model_loader.py` | `qwen3.5:397b-cloud` | 397B parameters |
 | Collection Name | `Data/question.py` | `question_collection` | Vector DB collection |
-| Interview Length | `main.py` | `10 questions` | Configurable per session |
-| RAG Threshold | `agents/supervisor_agent.py` | `3 questions` | Switch to LLM generation |
+| Interview Length | `main.py` | `10 questions` | Default max questions |
+| RAG → LLM Switch | `agents/supervisor_agent.py` | After 3 questions | Based on step count |
 | State Storage | `main.py` | `data/user_profiles.json` | Resume profiles |
-| Audio Cache | `utils/voice_tts.py` | `tmp_audio/` | Temporary WAV files |
+| TTS Model | `utils/voice_tts.py` | `facebook/mms-tts-eng` | English TTS model |
+| Redis Cache | `docker-compose.yml` | `redis:6379` | Audio file caching |
 
 ### 🎛️ Advanced Configuration
 
@@ -592,33 +596,32 @@ docker-compose up -d
 # docker-compose.yml
 version: '3.8'
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      - QDRANT_URL=http://qdrant:6333
     depends_on:
-      - qdrant
-      - ollama
-  
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-  
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
 volumes:
-  qdrant_data:
-  ollama_data:
+  redis_data:
 ```
 
 ### 🚀 Deployment Options
@@ -671,19 +674,18 @@ docker-compose up -d
 #### Adding New Domains
 
 ```python
-# 1. Define domain taxonomy in utils/domain.py
-NEW_DOMAIN = {
-    "healthcare": {
-        "topics": ["HIPAA", "EHR", "Medical Imaging", "Bioinformatics"],
-        "keywords": ["patient", "medical", "health", "clinical"]
-    }
-}
+# 1. Update domain detection in main.py
+def infer_profile_from_resume(text: str) -> dict:
+    # Add your domain detection logic here
+    if "healthcare" in text.lower():
+        return {"domain": "healthcare", "topic": "HIPAA", "difficulty": "medium"}
 
-# 2. Update domain detection
-def infer_domain(text: str) -> str:
-    if "healthcare" in detect_keywords(text):
-        return "healthcare"
-    # ... existing logic
+# 2. Update DOMAIN_TOPICS in agents/supervisor_agent.py
+DOMAIN_TOPICS = {
+    "tech": ["AI/ML", "Databases", "Web Dev", "Cloud"],
+    "finance": ["Valuation", "Risk", "Markets"],
+    "healthcare": ["HIPAA", "EHR", "Medical Imaging"]  # New domain
+}
 ```
 
 #### Custom Evaluation Metrics
@@ -745,10 +747,10 @@ async def test_full_interview_cycle():
 
 | **Area** | **Optimization** | **Impact** |
 |----------|------------------|------------|
-| Vector Search | Batch embedding queries | 50% faster retrieval |
-| Audio Generation | Pre-cache common questions | 90% reduction in TTS latency |
-| State Management | Pydantic optimizations | 30% smaller payload size |
-| Concurrent Processing | Async agent execution | 3x throughput improvement |
+| Audio Caching | Redis-based TTS cache | Reduces repeated TTS generation |
+| Hybrid Search | Qdrant RRF fusion | Better relevance through multiple strategies |
+| Async Operations | Async/await throughout | Non-blocking concurrent processing |
+| State Management | Serialized Pydantic models | Clean state transfer between requests |
 
 ---
 
@@ -758,10 +760,10 @@ async def test_full_interview_cycle():
 
 ### 📈 Key Metrics
 
-- **87% improvement** in question relevance using hybrid search vs embeddings alone
-- **Sub-2 second** response time for question generation
-- **95% accuracy** in domain detection from resumes
-- **Support for 5+ domains** with 50+ topics each
+- **Hybrid Search**: Combines dense embeddings with sparse BM25 for better relevance
+- **Fast Response**: Async agent architecture enables quick question generation
+- **Smart Difficulty**: Automatic adjustment based on rolling average of scores
+- **Multi-Domain**: Supports tech, finance, and other domains with topic-specific questions
 
 ### 🎯 Use Cases
 
