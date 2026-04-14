@@ -60,9 +60,9 @@
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        UI[Voice-First Web App]
-        UI --> |WebSocket| API[FastAPI Endpoints]
+    subgraph "Client Layer"
+        UI[Voice Interface]
+        UI --> API[FastAPI Endpoints]
     end
     
     subgraph "API Gateway"
@@ -140,7 +140,7 @@ graph TB
 | **Audio** | TTS Service | Local TTS | Text-to-WAV synthesis |
 | **Audio** | STT Service | Local STT | Speech-to-text transcription |
 | **Data** | PDF Processing | PyMuPDF + Chunking | Resume parsing, text extraction |
-| **Frontend** | Voice UI | Vanilla JS + Web Audio API | Real-time audio, waveform viz |
+| **Client** | Voice Interface | Audio Processing | Real-time audio handling |
 | **Storage** | File System | Local FS | User profiles, audio cache |
 
 ---
@@ -171,36 +171,7 @@ graph TB
 
 ---
 
-## 🖥️ Frontend Architecture
-
-The frontend showcases **modern web development** with a glassmorphism design system and real-time audio capabilities:
-
-### 🎨 UI/UX Features
-
-| **Screen** | **Technical Implementation** |
-|------------|-----------------------------|
-| **Landing** | CSS animations + gradient orbs for visual appeal |
-| **Setup** | Drag-and-drop file upload with progress indicators |
-| **Interview** | Split-pane layout with auto-scrolling transcript |
-| **Results** | Dynamic score visualization with topic heatmaps |
-
-### 🔊 Audio Pipeline
-
-```javascript
-// Voice Recording Flow
-getUserMedia() → MediaRecorder → Blob → POST /answer-voice
-                                               ↓
-Audio Playback Flow
-GET /audio/{id} → WAV Buffer → AudioContext → Speakers
-```
-
-### 📱 Frontend Tech Stack
-
-- **No Framework Dependencies** — Pure vanilla JavaScript demonstrating mastery of web APIs
-- **Web Audio API** — Real-time waveform visualization and audio processing
-- **CSS Grid/Flexbox** — Responsive layouts without utility frameworks
-- **Fetch API** — Async communication with proper error handling
-- **LocalStorage** — Client-side persistence for interview sessions
+## 🖥️ Client Interface
 
 ---
 
@@ -262,14 +233,12 @@ ollama pull qwen3.5:397b-cloud    # 397B parameter LLM
 # API Server (port 8000)
 uvicorn main:app --reload
 
-# Frontend Dev Server (port 3000, optional)
 cd frontend && python serve.py
 ```
 
 ### 🌐 Access Points
 
 - **API Documentation**: http://localhost:8000/docs
-- **Frontend Interface**: http://localhost:3000
 - **Health Check**: http://localhost:8000/
 - **Qdrant Dashboard**: http://localhost:6333/dashboard
 
@@ -436,11 +405,7 @@ AI_interviewer/
 │   ├── voice_stt.py           # Speech-to-text engine
 │   ├── difficulty.py          # Adaptive difficulty algorithms
 │   └── domain.py              # Domain taxonomy definitions
-├── 🎨 frontend/                # Voice-first web interface
-│   ├── index.html             # SPA with 4 interactive screens
-│   ├── style.css              # Glassmorphism design system
-│   ├── app.js                 # Web Audio API integration
-│   └── serve.py               # Development server
+├── frontend/                  # Client interface
 ├── 💾 data/                    # Persistent storage
 │   └── user_profiles.json     # Resume database (JSON)
 ├── 🔊 tmp_audio/               # Audio cache (auto-managed)
@@ -502,7 +467,7 @@ DOMAINS = {
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant F as Frontend
+    participant C as Client
     participant A as API Gateway
     participant S as Supervisor Agent
     participant Q as Question Agent
@@ -511,13 +476,13 @@ sequenceDiagram
     participant TTS as TTS Service
     participant STT as STT Service
     
-    U->>F: Upload Resume
-    F->>A: POST /resume/upload
+    U->>C: Upload Resume
+    C->>A: POST /resume/upload
     A->>A: Parse + Detect Domain
-    A-->>F: Profile Created
+    A-->>C: Profile Created
     
-    U->>F: Start Interview
-    F->>A: POST /interview/start
+    U->>C: Start Interview
+    C->>A: POST /interview/start
     A->>S: Initialize State
     S->>Q: Generate Question
     Q->>Q: RAG Search + LLM
@@ -525,11 +490,11 @@ sequenceDiagram
     S->>TTS: Synthesize Audio
     TTS-->>S: audio_id
     S-->>A: Question + State
-    A-->>F: Question + audio_id
-    F->>U: Play Audio
+    A-->>C: Question + audio_id
+    C->>U: Play Audio
     
-    U->>F: Answer (Voice/Text)
-    F->>A: POST /interview/answer*
+    U->>C: Answer (Voice/Text)
+    C->>A: POST /interview/answer*
     opt Voice Answer
         A->>STT: Transcribe Audio
         STT-->>A: Text
@@ -545,8 +510,8 @@ sequenceDiagram
         S->>Q: Next Question
     end
     S-->>A: Next Q or Done
-    A-->>F: Response
-    F->>U: Show Feedback + Next
+    A-->>C: Response
+    C->>U: Show Feedback + Next
 ```
 
 ### 📊 State Management Flow
