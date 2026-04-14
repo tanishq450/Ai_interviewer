@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, List, Dict, Any
 import json
 import json_repair
 import tempfile
@@ -12,6 +13,7 @@ import os
 import uvicorn
 from loguru import logger
 import uuid
+import re
 
 from agents.main_agent import InterviewGraph
 from agents.state import InterviewState
@@ -22,8 +24,6 @@ from Data.resume import ResumeEmbedder
 from utils.Data_ingestion import Docloader
 from utils.voice_tts import LocalTTSService
 from utils.voice_stt import LocalSTTService
-from typing import List, Dict, Any
-import re
 
 
 # -------------------------------
@@ -223,6 +223,7 @@ async def startup():
     tts_service = LocalTTSService(
         redis_host=os.getenv("REDIS_HOST", "localhost"),
         redis_port=int(os.getenv("REDIS_PORT", "6379")),
+        redis_password=os.getenv("REDIS_PASSWORD", ""),
     )
     stt_service = LocalSTTService()
 
@@ -311,7 +312,6 @@ async def start_interview(
         result_state = result["state"]
 
         question = result_state.current_question or "Tell me about yourself."
-        from starlette.concurrency import run_in_threadpool
         audio_id = await run_in_threadpool(tts_service.synthesize, question)
 
         return StartInterviewResponse(
@@ -387,7 +387,6 @@ async def submit_answer(request: Request):
         feedback = result_state.feedback[-1] if result_state.feedback else None
 
         done = result_state.question_count >= 10
-        from starlette.concurrency import run_in_threadpool
         audio_id = await run_in_threadpool(tts_service.synthesize, question) if question and not done else None
 
         return AnswerResponse(
@@ -424,7 +423,6 @@ async def submit_answer_voice(
         tmp_path = tmp.name
 
     try:
-        from starlette.concurrency import run_in_threadpool
         transcript = await run_in_threadpool(stt_service.transcribe, tmp_path)
         if not transcript:
             raise HTTPException(422, "Could not transcribe audio")
@@ -487,7 +485,6 @@ async def upload_resume(
         tmp_path = tmp.name
 
     try:
-        from starlette.concurrency import run_in_threadpool
         text = await run_in_threadpool(doc_loader.load_pdf, tmp_path)
 
         if not text:

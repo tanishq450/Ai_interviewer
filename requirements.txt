@@ -1,11 +1,9 @@
 langchain
 langgraph
-asyncio
-dotenv
+python-dotenv
 openai
 tiktoken
 streamlit
-langgraph
 llama-index
 langchain-tavily
 fastapi
@@ -14,15 +12,13 @@ loguru
 llama-index-llms-ollama
 llama-index-embeddings-ollama
 llama-index-embeddings-google-genai
-llama-index-llms-google-genai 
+llama-index-llms-google-genai
 pymupdf
 chonkie
-llama-index 
 faiss-cpu
 tavily
 python-multipart
 sentence-transformers
-chonkie
 qdrant-client
 fastembed
 llama-index-vector-stores-qdrant
@@ -32,5 +28,4 @@ torch
 scipy
 soundfile
 json-repair
-random
 redis

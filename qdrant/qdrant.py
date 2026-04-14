@@ -10,14 +10,18 @@ from qdrant_client.models import (
     Fusion
 )
 
+import os
+
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext
+
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 
 
 # ---------------- SIMPLE (LlamaIndex) ----------------
 def get_qdrant_vector_store(collection_name: str):
 
-    client = QdrantClient(url="http://localhost:6333")
+    client = QdrantClient(url=QDRANT_URL)
 
     vector_store = QdrantVectorStore(
         client=client,
@@ -35,7 +39,7 @@ def get_qdrant_vector_store(collection_name: str):
 class QdrantHybridClient:
 
     def __init__(self):
-        self.client = AsyncQdrantClient(url="http://localhost:6333")
+        self.client = AsyncQdrantClient(url=QDRANT_URL)
 
     # -------- CREATE COLLECTION --------
     async def create_collection(self, collection_name: str, dim: int = 2560):

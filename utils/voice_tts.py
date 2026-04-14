@@ -20,7 +20,7 @@ class LocalTTSService:
         redis_port: int = 6379,
         redis_db: int = 0,
         cache_ttl: int = 86400,  # 24 hours
-        redis_password: str = "Tanishq",
+        redis_password: str = "",
     ):
         self.model_name = model_name
         self.output_dir = Path(output_dir)
