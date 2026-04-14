@@ -853,9 +853,9 @@ If you use this project in your research or work, please cite:
 
 ### 👋 Connect
 
-- **Portfolio**: [your-portfolio.com](https://your-portfolio.com)
-- **LinkedIn**: [linkedin.com/in/your-profile](https://linkedin.com/in/your-profile)
-- **Email**: [your.email@example.com](mailto:your.email@example.com)
+- **Portfolio**: 
+- **LinkedIn**: 
+- **Email**: 
 
 ---
 
